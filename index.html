@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام كاشف التفاعلات الدوائية الذكي | Mono Interaction Checker</title>
+  
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Barcode & QR Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #f8fafc; /* Very light slate gray */
+      --bg-card: #ffffff; /* Clean white card background */
+      --bg-input: #f1f5f9; /* Soft input background */
+      --primary-orange: #f97316;
+      --primary-orange-hover: #ea580c;
+      --text-white: #0f172a; /* Dark text for headings/titles */
+      --text-gray: #475569; /* Slate gray text for descriptions */
+      --accent-blue: #0284c7; /* A slightly darker blue for better contrast in light mode */
+      --danger-red: #dc2626; /* Slightly darker red for contrast */
+      --success-green: #059669; /* Slightly darker green */
+      --warning-yellow: #d97706; /* Slightly darker yellow */
+      --border-color: rgba(0, 0, 0, 0.08); /* Soft dark border instead of white opacity */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Tajawal', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: radial-gradient(circle at 10% 20%, #f8fafc 0%, #e2e8f0 90%);
+      color: var(--text-white);
+      min-height: 100vh;
+      overflow-x: hidden;
+      direction: rtl;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--primary-orange);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--primary-orange-hover);
+    }
+
+    /* Layout Containers */
+    .app-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--bg-card), var(--bg-dark));
+      border-bottom: 2px solid var(--primary-orange);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 150px;
+      height: 4px;
+      background: var(--primary-orange);
+      box-shadow: 0 0 15px var(--primary-orange);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .brand-logo {
+      background: linear-gradient(135deg, var(--primary-orange), #ff9d00);
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffffff;
+      box-shadow: 0 5px 15px rgba(249, 115, 22, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 5px 15px rgba(249, 115, 22, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 5px 25px rgba(249, 115, 22, 0.6); }
+      100% { transform: scale(1); box-shadow: 0 5px 15px rgba(249, 115, 22, 0.4); }
+    }
+
+    .brand-name h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(to left, var(--text-white), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-name p {
+      font-size: 13px;
+      color: var(--text-gray);
+      margin-top: 2px;
+    }
+
+    .db-badge {
+      background: rgba(249, 115, 22, 0.1);
+      border: 1px solid var(--primary-orange);
+      color: var(--primary-orange);
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .db-badge span.indicator {
+      width: 8px;
+      height: 8px;
+      background-color: var(--success-green);
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px var(--success-green);
+    }
+
+    /* Screen Management */
+    .app-screens {
+      position: relative;
+      width: 100%;
+      min-height: 80vh;
+    }
+
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(-50px);
+    }
+
+    .screen.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+      position: relative;
+    }
+
+    /* Left Side: Scanner & Input (Now Home Screen) */
+    .interaction-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Tabs Styling */
+    .tabs-nav {
+      display: flex;
+      gap: 10px;
+      background: var(--bg-card);
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-gray);
+      padding: 12px 15px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: var(--primary-orange);
+      color: #ffffff;
+      border-color: var(--primary-orange);
+    }
+
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.4s forwards;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .btn-back {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-white);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Cairo', sans-serif;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-back:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateX(5px);
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 10px;
+    }
+
+    .panel-title i {
+      color: var(--primary-orange);
+    }
+
+    /* Scanner Viewport */
+    .scanner-container {
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      border: 2px dashed rgba(249, 115, 22, 0.4);
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .scanner-container.active {
+      border: 2px solid var(--primary-orange);
+      box-shadow: 0 0 20px rgba(249, 115, 22, 0.2);
+    }
+
+    #reader {
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    .scanner-overlay-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-gray);
+    }
+
+    .scanner-overlay-placeholder svg {
+      width: 60px;
+      height: 60px;
+      stroke: var(--primary-orange);
+      fill: none;
+      stroke-width: 1.5;
+      animation: scanLines 2.5s infinite ease-in-out;
+    }
+
+    @keyframes scanLines {
+      0%, 100% { transform: translateY(-10px); }
+      50% { transform: translateY(10px); }
+    }
+
+    .scanner-btn {
+      background: linear-gradient(135deg, var(--primary-orange), #ff7b00);
+      color: var(--bg-dark);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+      margin-top: 15px;
+    }
+
+    .scanner-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(249, 115, 22, 0.4);
+    }
+
+    .scanner-btn.stop {
+      background: var(--danger-red);
+      color: #fff;
+    }
+
+    /* Manual Search and Input */
+    .search-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      display: flex;
+      gap: 10px;
+    }
+
+    .search-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: var(--text-white);
+      font-size: 15px;
+      outline: none;
+      transition: all 0.3s ease;
+      text-align: right;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary-orange);
+      box-shadow: 0 0 10px rgba(249, 115, 22, 0.2);
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-top: 5px;
+      max-height: 250px;
+      overflow-y: auto;
+      z-index: 9999;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .autocomplete-item {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+      color: var(--text-white);
+    }
+
+    .autocomplete-item:hover {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--primary-orange);
+    }
+
+    .autocomplete-item .desc {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .autocomplete-item .code {
+      font-size: 12px;
+      color: var(--text-gray);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Selected Items Grid - Compact / High Density */
+    .scanned-list-wrapper {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .drugs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .drug-card {
+      background: linear-gradient(135deg, #ffffff, #f8fafc);
+      border: 1px solid var(--border-color);
+      border-right: 4px solid var(--primary-orange);
+      border-radius: 10px;
+      padding: 12px 15px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      animation: cardSlideIn 0.3s forwards cubic-bezier(0.19, 1, 0.22, 1);
+    }
+
+    @keyframes cardSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .drug-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--primary-orange);
+      box-shadow: 0 8px 18px rgba(249, 115, 22, 0.15);
+    }
+
+    .drug-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .drug-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-white);
+      line-height: 1.4;
+      max-width: 85%;
+    }
+
+    .btn-delete-card {
+      background: none;
+      border: none;
+      color: var(--text-gray);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-delete-card:hover {
+      color: var(--danger-red);
+      transform: scale(1.1);
+    }
+
+    .drug-card-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .drug-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .drug-badge.code {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--text-gray);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .drug-badge.active-ingredient {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .drug-badge.no-active {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger-red);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    /* Interaction Count Badge & Glowing Effect */
+    .interaction-count-badge {
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      background: linear-gradient(135deg, var(--danger-red), #ff6b6b);
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
+      border: 2px solid var(--bg-card);
+      animation: pulseAlert 1.5s infinite alternate;
+      z-index: 10;
+    }
+    @keyframes pulseAlert {
+      0% { transform: scale(1); box-shadow: 0 0 8px rgba(220, 38, 38, 0.5); }
+      100% { transform: scale(1.15); box-shadow: 0 0 16px rgba(220, 38, 38, 0.8); }
+    }
+
+    .drug-badge.interaction-alert-badge {
+      background: rgba(220, 38, 38, 0.08);
+      color: var(--danger-red);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+    }
+
+    /* Drug Name Box in Interaction Cards */
+    .drug-name-box {
+      background: rgba(220, 38, 38, 0.06);
+      color: var(--danger-red);
+      border: 1px solid rgba(220, 38, 38, 0.18);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 13px;
+      font-weight: 800;
+      display: inline-block;
+      direction: ltr;
+      margin: 0 4px;
+    }
+    .drug-name-box.food-mode {
+      background: rgba(249, 115, 22, 0.06);
+      color: var(--primary-orange-hover);
+      border-color: rgba(249, 115, 22, 0.18);
+    }
+    .drug-name-box.timeline-mode {
+      background: rgba(2, 132, 199, 0.06);
+      color: var(--accent-blue);
+      border-color: rgba(2, 132, 199, 0.18);
+    }
+
+    /* Formulations Layout Styles */
+    .active-ingredient-wrapper, .active-ingredient-card-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 100%;
+      margin-top: 3px;
+    }
+    .main-ingred-title {
+      font-weight: bold;
+      color: var(--text-white);
+      font-size: 13px;
+    }
+    .form-lines-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 3px;
+    }
+    .form-badge-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 700;
+      width: fit-content;
+      border: 1px solid;
+    }
+    .tab-badge-form { background: rgba(59, 130, 246, 0.07); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); }
+    .cap-badge-form { background: rgba(139, 92, 246, 0.07); color: #8b5cf6; border-color: rgba(139, 92, 246, 0.2); }
+    .susp-badge-form, .syr-badge-form, .sol-badge-form { background: rgba(16, 185, 129, 0.07); color: #10b981; border-color: rgba(16, 185, 129, 0.2); }
+    .inj-badge-form, .amp-badge-form, .vial-badge-form { background: rgba(239, 68, 68, 0.07); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
+    .cream-badge-form, .oint-badge-form, .gel-badge-form { background: rgba(245, 158, 11, 0.07); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+    .supp-badge-form { background: rgba(236, 72, 153, 0.07); color: #ec4899; border-color: rgba(236, 72, 153, 0.2); }
+    .drop-badge-form { background: rgba(6, 182, 212, 0.07); color: #06b6d4; border-color: rgba(6, 182, 212, 0.2); }
+    .inh-badge-form { background: rgba(20, 184, 166, 0.07); color: #14b8a6; border-color: rgba(20, 184, 166, 0.2); }
+    .other-badge-form { background: rgba(107, 114, 128, 0.07); color: #6b7280; border-color: rgba(107, 114, 128, 0.2); }
+
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .btn-action-main {
+      flex: 2;
+      background: linear-gradient(135deg, var(--primary-orange), #ff6200);
+      color: var(--bg-dark);
+      border: none;
+      border-radius: 8px;
+      padding: 16px 28px;
+      font-size: 17px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .btn-action-main:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.5);
+    }
+
+    .btn-action-clear {
+      flex: 1;
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger-red);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action-clear:hover {
+      background: var(--danger-red);
+      color: #fff;
+    }
+
+    /* Right Side: Analysis Results */
+    .analysis-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .results-section {
+      display: none;
+      animation: panelFadeIn 0.4s forwards;
+    }
+
+    @keyframes panelFadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-group {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    .result-group-header {
+      font-size: 17px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 2px solid;
+      padding-bottom: 12px;
+    }
+
+    .result-group-header.drug-drug {
+      color: var(--danger-red);
+      border-color: var(--danger-red);
+    }
+
+    .result-group-header.drug-food {
+      color: var(--primary-orange);
+      border-color: var(--primary-orange);
+    }
+
+    .result-group-header.admin-guide {
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    /* Interaction Cards */
+    .interaction-alert-card {
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-right: 5px solid var(--danger-red);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: alertBlink 1.5s infinite alternate;
+    }
+
+    @keyframes alertBlink {
+      0% { border-color: rgba(239, 68, 68, 0.2); }
+      100% { border-color: rgba(239, 68, 68, 0.6); }
+    }
+
+    .alert-card-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--danger-red);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-card-severity {
+      background: var(--danger-red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-right: auto;
+    }
+
+    .alert-card-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-white);
+    }
+
+    /* Food Interactions */
+    .food-interaction-card {
+      background: rgba(249, 115, 22, 0.05);
+      border: 1px solid rgba(249, 115, 22, 0.15);
+      border-right: 5px solid var(--primary-orange);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .food-card-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--primary-orange-hover);
+    }
+
+    .food-card-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-white);
+    }
+
+    /* Administration Guide Timeline */
+    .timeline-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      position: relative;
+      padding-right: 20px;
+      border-right: 2px dashed rgba(56, 189, 248, 0.2);
+    }
+
+    .timeline-item {
+      position: relative;
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 14px 18px;
+      border-radius: 8px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      right: -27px;
+      width: 12px;
+      height: 12px;
+      background: var(--accent-blue);
+      border: 3px solid var(--bg-dark);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-blue);
+    }
+
+    .timeline-time {
+      font-weight: 700;
+      color: var(--accent-blue);
+      font-size: 14px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timeline-desc {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-white);
+    }
+
+    /* Status Screen Placeholder */
+    .status-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 30px;
+      text-align: center;
+      color: var(--text-gray);
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1px dashed var(--border-color);
+    }
+
+    .status-placeholder svg {
+      width: 80px;
+      height: 80px;
+      stroke: var(--primary-orange);
+      fill: none;
+      stroke-width: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .status-placeholder h2 {
+      font-size: 20px;
+      color: var(--text-white);
+      margin-bottom: 10px;
+    }
+
+    .status-placeholder p {
+      font-size: 14px;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 200000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+
+    .confirm-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 30px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(10px);
+      transform: scale(0.9);
+      animation: confirmModalScale 0.3s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes confirmModalScale {
+      to { transform: scale(1); }
+    }
+
+    .warning-icon-art {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, var(--primary-orange), #ff4e00);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+    }
+
+    .exclamation-mark {
+      color: #fff;
+      font-size: 32px;
+      font-weight: bold;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .confirm-title {
+      color: var(--text-white);
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 24px 0;
+    }
+
+    .confirm-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn-confirm-yes {
+      background: var(--primary-orange);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+    }
+
+    .btn-confirm-yes:hover {
+      background: var(--primary-orange-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-confirm-no {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--text-gray);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-confirm-no:hover {
+      background: rgba(0, 0, 0, 0.1);
+      color: var(--text-white);
+      transform: translateY(-2px);
+    }
+
+    /* Back Button */
+    .btn-back {
+      background: var(--bg-card);
+      color: var(--text-white);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .btn-back:hover {
+      background: var(--primary-orange);
+      color: #ffffff;
+      border-color: var(--primary-orange);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(249, 115, 22, 0.25);
+    }
+
+    /* Screen Loader */
+    #loaderScreen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 300000;
+      transition: opacity 0.5s ease;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary-orange);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loader-text {
+      color: var(--text-white);
+      font-size: 16px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen Loader -->
+  <div id="loaderScreen">
+    <div class="spinner"></div>
+    <div class="loader-text">جاري تحميل وتزامن قاعدة بيانات المنتجات (23,000+ صنف)...</div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="brand-section">
+        <div class="brand-logo">🔬</div>
+        <div class="brand-name">
+          <h1>فاحص التفاعلات الدوائية الذكي</h1>
+          <p>أمان وصحة المريض أولاً بالمسح والبحث السريع</p>
+        </div>
+      </div>
+      <div class="db-badge">
+        <span class="indicator"></span>
+        <span id="dbCountText">جاري فحص حالة الأدوية...</span>
+      </div>
+    </header>
+
+    <!-- App Screens Container -->
+    <div class="app-screens">
+      
+      <!-- Screen 1: Home (Scanner & Selection) -->
+      <div id="homeScreen" class="screen active">
+        <div class="interaction-panel">
+          
+          <!-- Barcode Scanner -->
+          <div class="panel-card">
+            <div class="panel-title">
+              <i>📷</i>
+              <span>ماسح الباركود المباشر للكاميرا</span>
+            </div>
+            
+            <div class="scanner-container" id="scannerWrapper">
+              <div id="reader" style="display: none;"></div>
+              
+              <div class="scanner-overlay-placeholder" id="scannerPlaceholder">
+                <svg viewBox="0 0 24 24">
+                  <rect x="2" y="2" width="20" height="20" rx="4" stroke-width="1.5"></rect>
+                  <line x1="2" y1="12" x2="22" y2="12" stroke-width="2"></line>
+                </svg>
+                <p>وجه كاميرا الهاتف نحو الباركود أو الرمز الطبي للمنتج للإضافة الفورية</p>
+                <button class="scanner-btn" onclick="startCameraScanner()">
+                  تشغيل ماسح الكاميرا الآن
+                </button>
+              </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+              <span id="scannerFeedback" style="font-size: 13px; color: var(--text-gray);">الحالة: جاهز لمسح الباركود</span>
+              <button class="scanner-btn stop" id="btnStopScanner" style="display: none;" onclick="stopCameraScanner()">
+                إيقاف الكاميرا
+              </button>
+            </div>
+          </div>
+
+          <!-- Manual Add & Search -->
+          <div class="panel-card" style="position: relative; z-index: 10;">
+            <div class="panel-title">
+              <i>🔍</i>
+              <span>ابحث بالاسم التجاري، الباركود، أو المادة الفعالة</span>
+            </div>
+            
+            <div class="search-group">
+              <div class="search-input-wrapper">
+                <input type="text" id="manualSearchInput" class="search-input" placeholder="اكتب اسم الدواء أو المادة الفعالة (مثال: Panadol, Paracetamol)..." oninput="handleSearchAutocomplete(this.value)">
+              </div>
+              
+              <div class="autocomplete-list" id="autocompleteResults" style="display: none;"></div>
+            </div>
+          </div>
+
+          <!-- Scanned/Selected Items High Density Grid -->
+          <div class="panel-card">
+            <div class="panel-title" style="margin-bottom: 12px;">
+              <i>💊</i>
+              <span>الأدوية المضافة للفحص الحالي (<span id="selectedCount">0</span> أصناف)</span>
+            </div>
+            
+            <div class="scanned-list-wrapper">
+              <div class="drugs-grid" id="selectedDrugsGrid">
+                <!-- Cards are rendered dynamically -->
+              </div>
+            </div>
+
+            <div class="action-bar">
+              <button class="btn-action-main" onclick="checkInteractions()">
+                <span>⚡</span> ابدأ فحص التداخلات الدوائية والأكل
+              </button>
+              
+              <button class="btn-action-clear" onclick="openDeleteModal()">
+                مسح الكل
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Screen 2: Results Screen -->
+      <div id="resultsScreen" class="screen">
+        <div class="analysis-panel">
+          
+          <div class="results-header">
+            <h2 style="font-size: 22px; color: var(--text-white);">النتائج والتقارير الطبية</h2>
+            <button class="btn-back" onclick="showHomeScreen()">
+              <span>رجوع</span>
+              <span>➡️</span>
+            </button>
+          </div>
+
+          <!-- Tabs Navigation -->
+          <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-drug-drug')" id="btn-tab-drug-drug">تداخلات الأدوية</button>
+            <button class="tab-btn" onclick="switchTab('tab-drug-food')" id="btn-tab-drug-food">تداخلات الغذاء</button>
+            <button class="tab-btn" onclick="switchTab('tab-timeline')" id="btn-tab-timeline">مواعيد الجرعات</button>
+          </div>
+
+          <!-- Results Viewport -->
+          <div class="results-section" id="resultsViewport" style="display: block;">
+            
+            <!-- Category 1: Drug-Drug interactions -->
+            <div class="result-group tab-panel active" id="tab-drug-drug">
+              <div class="result-group-header drug-drug">
+                <span>🔴</span>
+                <span>تفاعل دواء - دواء (Drug-Drug Interactions)</span>
+              </div>
+              <div id="drugDrugResultsContainer">
+                <!-- Dynamic alert panels -->
+              </div>
+            </div>
+
+            <!-- Category 2: Drug-Food interactions -->
+            <div class="result-group tab-panel" id="tab-drug-food">
+              <div class="result-group-header drug-food">
+                <span>🍊</span>
+                <span>تفاعل الدواء مع الطعام والشراب (Food-Drug Interactions)</span>
+              </div>
+              <div id="drugFoodResultsContainer">
+                <!-- Dynamic food panels -->
+              </div>
+            </div>
+
+            <!-- Category 3: Administration Guide -->
+            <div class="result-group tab-panel" id="tab-timeline">
+              <div class="result-group-header admin-guide">
+                <span>⏰</span>
+                <span>المخطط الزمني الأمثل للجرعات (Chronotherapy Timeline)</span>
+              </div>
+              <div class="timeline-container" id="adminTimelineContainer">
+                <!-- Dynamic timeline -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  <!-- Delete Confirm Overlay -->
+  <div id="deleteConfirmOverlay" class="modal-overlay">
+    <div class="confirm-card">
+      <div class="warning-icon-art">
+        <div class="exclamation-mark">!</div>
+      </div>
+      <h3 class="confirm-title">مسح جميع الأدوية الحالية؟</h3>
+      <div class="confirm-btns">
+        <button onclick="executeClearAll()" class="btn-confirm-yes">نعم، مسح الكل</button>
+        <button onclick="closeDeleteModal()" class="btn-confirm-no">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Javascript Core Engine -->
+  <script>
+    // ==========================================
+    // 1) Medical Intelligence Database
+    // ==========================================
+    // ==========================================
+    // 1) Medical Intelligence Database (Offline Sync)
+    // ==========================================
+    let OFFLINE_DRUG_DRUG = [];
+    let OFFLINE_DRUG_FOOD = {};
+    let OFFLINE_ADMIN_TIMELINE = {};
+
+    async function loadInteractionDatabases() {
+      try {
+        const [ddRes, dfRes, atRes] = await Promise.all([
+          fetch("interactions_db/drug_drug.json"),
+          fetch("interactions_db/drug_food.json"),
+          fetch("interactions_db/admin_timeline.json")
+        ]);
+        if (ddRes.ok) OFFLINE_DRUG_DRUG = await ddRes.json();
+        if (dfRes.ok) OFFLINE_DRUG_FOOD = await dfRes.json();
+        if (atRes.ok) OFFLINE_ADMIN_TIMELINE = await atRes.json();
+        console.log("✅ Offline interaction databases loaded.");
+      } catch(e) {
+        console.log("⚠️ Could not load offline interaction databases.", e);
+      }
+    }
+
+    // ==========================================
+    // 2) Application State
+    // ==========================================
+    let productsDB = [];
+    let selectedDrugs = [];
+    let html5QrScanner = null;
+    let lastScannedValue = "";
+    let lastScannedAt = 0;
+
+    // ==========================================
+    // 3) Initial Sync & Load DB
+    // ==========================================
+    window.addEventListener("DOMContentLoaded", async () => {
+      await fetchProductsDatabase();
+      hideLoaderScreen();
+    });
+
+    async function fetchProductsDatabase() {
+      const dbBadgeText = document.getElementById("dbCountText");
+      const urls = ["master1.json", "master2.json", "master3.json"];
+
+      try {
+        console.log("⏳ Loading medicines master databases...");
+        const responses = await Promise.all(urls.map(url => fetch(url).catch(() => null)));
+        
+        let combined = [];
+        for (const res of responses) {
+          if (res && res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) combined.push(...data);
+          }
+        }
+
+        productsDB = combined.map(p => ({
+          Code: String(p?.["Code"] ?? p?.code ?? "").trim(),
+          Brand: p?.["Brand"] ?? p?.brand ?? p?.["أسم المنتج"] ?? "",
+          "Item Description": p?.["Item Description"] ?? p?.item_description ?? p?.itemdescription ?? "",
+          "Active Ingredient": p?.["Category Level E"] ?? ""
+        })).filter(p => p.Code);
+
+        console.log(`✅ Loaded ${productsDB.length} items from Master DBs.`);
+        dbBadgeText.textContent = `متصل: ${productsDB.length.toLocaleString('ar-EG')} دواء في قاعدة البيانات الماستر`;
+        
+        // Also fetch offline interaction databases
+        await loadInteractionDatabases();
+      } catch (err) {
+        console.error("Database connection failure:", err);
+        dbBadgeText.textContent = "فشل تزامن قاعدة البيانات الماستر";
+      }
+    }
+
+    function hideLoaderScreen() {
+      const loader = document.getElementById("loaderScreen");
+      if (loader) {
+        loader.style.opacity = "0";
+        setTimeout(() => loader.style.display = "none", 500);
+      }
+    }
+
+    // ==========================================
+    // 4) Dynamic Intelligent Ingredient Matcher
+    // ==========================================
+    function detectActiveIngredient(product) {
+      const active = product["Active Ingredient"];
+      if (active && active.trim() !== "" && active !== "null") {
+         return {
+           key: active.toLowerCase(),
+           name: active
+         };
+      }
+      return null;
+    }
+
+    // Helper to format active ingredient and parse formulations (tabs, capsules, etc.)
+    function formatActiveIngredientHTML(activeIngredientStr) {
+      if (!activeIngredientStr || activeIngredientStr === "null") {
+        return '<span class="form-badge-line other-badge-form"><span class="form-icon">💊</span><span class="form-name">المادة الفعالة غير محددة</span></span>';
+      }
+      
+      const parenRegex = /\(([^)]+)\)/;
+      const match = activeIngredientStr.match(parenRegex);
+      
+      let mainName = activeIngredientStr;
+      let forms = [];
+      
+      if (match) {
+        mainName = activeIngredientStr.replace(parenRegex, '').trim();
+        const rawForms = match[1];
+        const parts = rawForms.split(/[&+\/,]|\band\b/i).map(s => s.trim().toUpperCase());
+        
+        parts.forEach(part => {
+          if (part.includes('TAB')) forms.push({ icon: '💊', name: 'أقراص (Tablets)', class: 'tab-badge-form' });
+          else if (part.includes('CAP')) forms.push({ icon: '💊', name: 'كبسولات (Capsules)', class: 'cap-badge-form' });
+          else if (part.includes('SUSP')) forms.push({ icon: '🧪', name: 'شراب معلق (Suspension)', class: 'susp-badge-form' });
+          else if (part.includes('SYR')) forms.push({ icon: '🧪', name: 'شراب (Syrup)', class: 'syr-badge-form' });
+          else if (part.includes('INJ')) forms.push({ icon: '💉', name: 'حقن (Injection)', class: 'inj-badge-form' });
+          else if (part.includes('AMP')) forms.push({ icon: '💉', name: 'أمبولات (Ampoules)', class: 'amp-badge-form' });
+          else if (part.includes('VIAL')) forms.push({ icon: '💉', name: 'فيال (Vial)', class: 'vial-badge-form' });
+          else if (part.includes('CREAM')) forms.push({ icon: '🧴', name: 'كريم (Cream)', class: 'cream-badge-form' });
+          else if (part.includes('OINT')) forms.push({ icon: '🧴', name: 'مرهم (Ointment)', class: 'oint-badge-form' });
+          else if (part.includes('GEL')) forms.push({ icon: '🧴', name: 'جل (Gel)', class: 'gel-badge-form' });
+          else if (part.includes('SOL')) forms.push({ icon: '🧪', name: 'محلول (Solution)', class: 'sol-badge-form' });
+          else if (part.includes('SUPP')) forms.push({ icon: '🩹', name: 'لبوس / تحاميل (Suppository)', class: 'supp-badge-form' });
+          else if (part.includes('DROP')) forms.push({ icon: '💧', name: 'قطرات (Drops)', class: 'drop-badge-form' });
+          else if (part.includes('INH')) forms.push({ icon: '💨', name: 'استنشاق (Inhaler)', class: 'inh-badge-form' });
+          else forms.push({ icon: '📦', name: part, class: 'other-badge-form' });
+        });
+      }
+      
+      let html = `<div class="main-ingred-title">${mainName}</div>`;
+      if (forms.length > 0) {
+        html += `<div class="form-lines-wrapper">`;
+        forms.forEach(f => {
+          html += `<div class="form-badge-line ${f.class}">
+            <span class="form-icon">${f.icon}</span>
+            <span class="form-name">${f.name}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      return html;
+    }
+
+    // Helper to calculate drug interaction count with other selected drugs
+    function calculateDrugInteractionsCount(drug, allSelected) {
+      if (!drug.activeIngredient) return 0;
+      const key1 = drug.activeIngredient.key;
+      let count = 0;
+      const checkedIngredients = new Set();
+      
+      allSelected.forEach(other => {
+        if (other.Code === drug.Code || !other.activeIngredient) return;
+        const key2 = other.activeIngredient.key;
+        if (checkedIngredients.has(key2)) return;
+        checkedIngredients.add(key2);
+        
+        // Check offline drug-drug
+        const match = OFFLINE_DRUG_DRUG.find(inter => {
+          const has1 = inter.drugs.some(d => key1.includes(d.toLowerCase()) || d.toLowerCase().includes(key1));
+          const has2 = inter.drugs.some(d => key2.includes(d.toLowerCase()) || d.toLowerCase().includes(key2));
+          return has1 && has2;
+        });
+        if (match) {
+          count++;
+        }
+      });
+      return count;
+    }
+
+    // ==========================================
+    // 5) Scanner Integration (html5-qrcode)
+    // ==========================================
+    async function startCameraScanner() {
+      const placeholder = document.getElementById("scannerPlaceholder");
+      const readerDiv = document.getElementById("reader");
+      const feedback = document.getElementById("scannerFeedback");
+      const btnStop = document.getElementById("btnStopScanner");
+      const wrapper = document.getElementById("scannerWrapper");
+
+      if (typeof Html5Qrcode === 'undefined') {
+        feedback.textContent = "خطأ: مكتبة المسح لم تكتمل بعد!";
+        feedback.style.color = "var(--danger-red)";
+        return;
+      }
+
+      placeholder.style.display = "none";
+      readerDiv.style.display = "block";
+      btnStop.style.display = "inline-flex";
+      wrapper.classList.add("active");
+      feedback.textContent = "جاري فتح الكاميرا وتفعيل الحماية...";
+      feedback.style.color = "var(--primary-orange)";
+
+      try {
+        html5QrScanner = new Html5Qrcode("reader");
+        const config = {
+          fps: 25,
+          qrbox: (vw, vh) => {
+            const size = Math.min(vw * 0.85, vh * 0.85, 300);
+            return { width: size, height: size };
+          },
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        };
+
+        await html5QrScanner.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            const cleanCode = String(decodedText || "").trim();
+            const now = Date.now();
+            
+            if (!cleanCode) return;
+            if (cleanCode === lastScannedValue && now - lastScannedAt < 1500) return; // Prevent double-trigger
+
+            lastScannedValue = cleanCode;
+            lastScannedAt = now;
+            
+            triggerBeepSound();
+            triggerHapticFeedback();
+            
+            feedback.textContent = `تم مسح الباركود بنجاح: ${cleanCode}`;
+            feedback.style.color = "var(--success-green)";
+            
+            addDrugByCode(cleanCode);
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error("Camera scanner initialize failure:", err);
+        feedback.textContent = "حدث خطأ أثناء فتح الكاميرا. تأكد من إعطاء الصلاحية.";
+        feedback.style.color = "var(--danger-red)";
+        stopCameraScanner();
+      }
+    }
+
+    async function stopCameraScanner() {
+      const placeholder = document.getElementById("scannerPlaceholder");
+      const readerDiv = document.getElementById("reader");
+      const feedback = document.getElementById("scannerFeedback");
+      const btnStop = document.getElementById("btnStopScanner");
+      const wrapper = document.getElementById("scannerWrapper");
+
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+        } catch (e) {
+          console.log("Scanner already stopped");
+        }
+        html5QrScanner = null;
+      }
+
+      readerDiv.style.display = "none";
+      placeholder.style.display = "flex";
+      btnStop.style.display = "none";
+      wrapper.classList.remove("active");
+      feedback.textContent = "الحالة: تم إيقاف الكاميرا";
+      feedback.style.color = "var(--text-gray)";
+    }
+
+    function triggerBeepSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // high pitch beep
+        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.12);
+      } catch (e) {
+        console.log("Beep audio blocked");
+      }
+    }
+
+    function triggerHapticFeedback() {
+      if (navigator.vibrate) {
+        navigator.vibrate(100);
+      }
+    }
+
+    // ==========================================
+    // 6) Add Items & Match Active Ingredients
+    // ==========================================
+    function addDrugByCode(code) {
+      const cleanCode = String(code).trim();
+      if (!cleanCode) return;
+
+      // Avoid double add
+      if (selectedDrugs.some(d => d.Code === cleanCode)) {
+        document.getElementById("scannerFeedback").textContent = "الصنف مضاف بالفعل لقائمة الفحص!";
+        document.getElementById("scannerFeedback").style.color = "var(--warning-yellow)";
+        return;
+      }
+
+      let matchedProduct = productsDB.find(p => p.Code === cleanCode);
+      
+      if (!matchedProduct) {
+        // Fallback placeholder product if code not in local 23,000 DB
+        matchedProduct = {
+          Code: cleanCode,
+          Brand: `دواء غير معروف (${cleanCode})`,
+          "Item Description": "لم يتم العثور على التفاصيل في قاعدة البيانات"
+        };
+      }
+
+      // Run active ingredient detector from Category Level E
+      const detectedInfo = detectActiveIngredient(matchedProduct);
+      
+      const newDrug = {
+        ...matchedProduct,
+        activeIngredient: detectedInfo || null
+      };
+
+      selectedDrugs.push(newDrug);
+      renderSelectedDrugs();
+    }
+
+    // Manual Autocomplete Search
+    function handleSearchAutocomplete(query) {
+      const listDiv = document.getElementById("autocompleteResults");
+      const cleanQuery = query.trim().toLowerCase();
+
+      if (!cleanQuery || !productsDB.length) {
+        listDiv.style.display = "none";
+        listDiv.innerHTML = "";
+        return;
+      }
+
+      // Filter products (Brand, Code, or Active Ingredient matching)
+      const matches = productsDB.filter(p => {
+        const hasBrand = p.Brand && p.Brand.toLowerCase().includes(cleanQuery);
+        const hasCode = p.Code && p.Code.includes(cleanQuery);
+        const hasActive = p["Active Ingredient"] && p["Active Ingredient"].toLowerCase().includes(cleanQuery);
+        return hasBrand || hasCode || hasActive;
+      }).slice(0, 10); // Limit to top 10 for performance
+
+      if (matches.length === 0) {
+        listDiv.style.display = "block";
+        listDiv.innerHTML = `
+          <div style="padding:15px; text-align:center; color:var(--text-gray); font-size:14px;">
+            ⚠️ لم يتم العثور على أدوية مطابقة
+          </div>
+        `;
+        return;
+      }
+
+      listDiv.style.display = "block";
+      listDiv.innerHTML = matches.map(p => `
+        <div class="autocomplete-item" onclick="selectSearchItem('${p.Code}')">
+          <div class="desc">
+             ${p.Brand || 'صنف غير مسمى'}
+             <div class="active-ingredient-wrapper">${formatActiveIngredientHTML(p["Active Ingredient"])}</div>
+          </div>
+          <div class="code">#${p.Code}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectSearchItem(code) {
+      addDrugByCode(code);
+      document.getElementById("manualSearchInput").value = "";
+      document.getElementById("autocompleteResults").style.display = "none";
+    }
+
+    function deleteDrugCard(code) {
+      selectedDrugs = selectedDrugs.filter(d => d.Code !== code);
+      renderSelectedDrugs();
+    }
+
+    // Render Scanned / Selected Grid
+    function renderSelectedDrugs() {
+      const grid = document.getElementById("selectedDrugsGrid");
+      const countLabel = document.getElementById("selectedCount");
+      
+      countLabel.textContent = selectedDrugs.length;
+      grid.innerHTML = "";
+
+      if (selectedDrugs.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1/-1; text-align:center; padding: 40px 10px; color: var(--text-gray); font-size:14px;">
+            لا توجد أدوية مضافة حالياً. استخدم الكاميرا للمسح أو اكتب بالبحث بالأعلى 💊
+          </div>
+        `;
+        return;
+      }
+
+      selectedDrugs.forEach(drug => {
+        const hasIngredient = drug.activeIngredient !== null;
+        
+        // Calculate interaction count with other selected drugs
+        const interactionCount = calculateDrugInteractionsCount(drug, selectedDrugs);
+        
+        // Create interaction count bubble (CSS Art)
+        let bubbleHTML = '';
+        let detailsAlertHTML = '';
+        if (interactionCount > 0) {
+          bubbleHTML = `<div class="interaction-count-badge" title="لديه تداخلات مع الأدوية المضافة">${interactionCount}</div>`;
+          detailsAlertHTML = `<span class="drug-badge interaction-alert-badge">⚠️ لديه تداخلات (${interactionCount})</span>`;
+        }
+        
+        const card = document.createElement("div");
+        card.className = "drug-card";
+        card.innerHTML = `
+          ${bubbleHTML}
+          <div class="drug-card-header">
+            <span class="drug-card-title">${drug.Brand || 'دواء مجهول'}</span>
+            <button class="btn-delete-card" onclick="deleteDrugCard('${drug.Code}')" title="مسح الصنف">
+              &times;
+            </button>
+          </div>
+          <div class="drug-card-details">
+            <span class="drug-badge code">#${drug.Code}</span>
+            ${detailsAlertHTML}
+            <div class="active-ingredient-card-wrapper ${hasIngredient ? 'active-ingredient' : 'no-active'}">
+              ${formatActiveIngredientHTML(drug["Active Ingredient"])}
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // ==========================================
+    // 7) Core Drug Interaction Checker Engine
+    // ==========================================
+    function checkInteractions() {
+      const ddContainer = document.getElementById("drugDrugResultsContainer");
+      const dfContainer = document.getElementById("drugFoodResultsContainer");
+      const timelineContainer = document.getElementById("adminTimelineContainer");
+
+      if (selectedDrugs.length === 0) {
+        alert("يرجى إضافة دواء واحد على الأقل قبل الفحص.");
+        return;
+      }
+
+      showResultsScreen();
+
+      ddContainer.innerHTML = "";
+      dfContainer.innerHTML = "";
+      timelineContainer.innerHTML = "";
+
+      // Fetch all detected ingredients keys (filter nulls)
+      const selectedKeys = selectedDrugs
+        .filter(d => d.activeIngredient !== null)
+        .map(d => d.activeIngredient.key);
+
+      // --- 1. Process Drug-Drug Interactions ---
+      let detectedDDCount = 0;
+      const checkedPairs = new Set();
+
+      for (let i = 0; i < selectedDrugs.length; i++) {
+        for (let j = i + 1; j < selectedDrugs.length; j++) {
+          const d1 = selectedDrugs[i];
+          const d2 = selectedDrugs[j];
+
+          if (!d1.activeIngredient || !d2.activeIngredient) continue;
+
+          const key1 = d1.activeIngredient.key;
+          const key2 = d2.activeIngredient.key;
+
+          const pairId = [key1, key2].sort().join('-');
+          if (checkedPairs.has(pairId)) continue;
+          checkedPairs.add(pairId);
+
+          // Lookup in interaction matrix (Offline JSON DB)
+          const match = OFFLINE_DRUG_DRUG.find(inter => {
+             const has1 = inter.drugs.some(d => key1.includes(d.toLowerCase()) || d.toLowerCase().includes(key1));
+             const has2 = inter.drugs.some(d => key2.includes(d.toLowerCase()) || d.toLowerCase().includes(key2));
+             return has1 && has2;
+          });
+
+          if (match) {
+            detectedDDCount++;
+            const alertCard = document.createElement("div");
+            alertCard.className = "interaction-alert-card";
+            alertCard.innerHTML = `
+              <div class="alert-card-title">
+                <span class="drug-name-box">${d1.Brand}</span>
+                <span style="font-weight: 500; font-size: 13px; color: var(--text-gray);">+</span>
+                <span class="drug-name-box">${d2.Brand}</span>
+                <span class="alert-card-severity">${match.severity}</span>
+              </div>
+              <div class="alert-card-desc">
+                ${match.desc}
+              </div>
+            `;
+            ddContainer.appendChild(alertCard);
+          }
+        }
+      }
+
+      if (detectedDDCount === 0) {
+        ddContainer.innerHTML = `
+          <div id="safeMessageBanner" style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); color: var(--success-green); padding: 15px 20px; border-radius: 8px; font-size:14px; font-weight:bold;">
+            🟢 لا توجد تداخلات حادة وخطيرة مكتشفة في قاعدة البيانات المحلية. (جاري الفحص المتقدم...)
+          </div>
+        `;
+      }
+
+      // --- 2. Process Food/Drink Interactions & Administration Guide ---
+      let addedFoodInteraction = false;
+      const addedIngredients = new Set();
+
+      selectedDrugs.forEach(drug => {
+        if (!drug.activeIngredient) return;
+        const ing = drug.activeIngredient;
+        const key = ing.key;
+
+        if (addedIngredients.has(key)) return;
+        addedIngredients.add(key);
+
+        const dfKeyMatch = Object.keys(OFFLINE_DRUG_FOOD).find(k => key.includes(k.toLowerCase()) || k.toLowerCase().includes(key));
+        const timeKeyMatch = Object.keys(OFFLINE_ADMIN_TIMELINE).find(k => key.includes(k.toLowerCase()) || k.toLowerCase().includes(key));
+
+        if (dfKeyMatch || timeKeyMatch) {
+            addedFoodInteraction = true;
+        }
+
+        // Food/Drink Interaction Panel
+        if (dfKeyMatch) {
+            const foodData = OFFLINE_DRUG_FOOD[dfKeyMatch];
+            const foodCard = document.createElement("div");
+            foodCard.className = "food-interaction-card";
+            foodCard.innerHTML = `
+              <div class="food-card-title">
+                🍎 إرشادات الغذاء لـ <span class="drug-name-box food-mode">${drug.Brand}</span> (${ing.name})
+              </div>
+              <div class="food-card-desc">${foodData.foodInteraction}</div>
+            `;
+            dfContainer.appendChild(foodCard);
+        }
+
+        // Timeline item for Chronotherapy administration
+        if (timeKeyMatch) {
+            const timeData = OFFLINE_ADMIN_TIMELINE[timeKeyMatch];
+            const timelineItem = document.createElement("div");
+            timelineItem.className = "timeline-item";
+            timelineItem.innerHTML = `
+              <div class="timeline-desc" style="margin-bottom: 8px;">
+                <strong>المادة:</strong> <span class="drug-name-box timeline-mode">${ing.name}</span>
+              </div>
+              <div class="timeline-time">
+                <span>⏱️</span>
+                <span>الخطة: ${timeData}</span>
+              </div>
+            `;
+            timelineContainer.appendChild(timelineItem);
+        }
+      });
+
+      if (!addedFoodInteraction) {
+        dfContainer.innerHTML = `
+          <div style="color: var(--text-gray); font-size: 14px; text-align:center; padding: 20px;">
+            قم بإضافة أدوية معروفة لعرض تداخلاتها الغذائية وتوقيتاتها المثالية.
+          </div>
+        `;
+        timelineContainer.innerHTML = `
+          <div style="color: var(--text-gray); font-size: 14px; text-align:center; padding: 20px;">
+            بانتظار خطة توقيت الجرعات...
+          </div>
+        `;
+      }
+
+      // --- 3. Fetch Advanced interactions from RxNav API online ---
+      if (selectedKeys.length > 1) {
+          fetchRxNavInteractions(selectedDrugs, ddContainer, detectedDDCount);
+      }
+    }
+
+    async function fetchRxNavInteractions(selectedDrugsList, container, offlineDetectedCount) {
+        const loadingId = "rxnav-loading-" + Date.now();
+        try {
+            const rxcuis = [];
+            
+            // Add loading indicator
+            const loadingDiv = document.createElement("div");
+            loadingDiv.id = loadingId;
+            loadingDiv.style.cssText = "text-align:center; padding:15px; color:var(--accent-blue); font-size:14px; font-weight:bold; animation: pulse 2s infinite;";
+            loadingDiv.innerHTML = "جاري الفحص المتقدم عبر API الطبي العالمي (RxNav)... ⏳";
+            container.appendChild(loadingDiv);
+
+            // Fetch CUIs for each drug
+            for (const drug of selectedDrugsList) {
+                if (!drug.activeIngredient) continue;
+                const baseName = drug.activeIngredient.name.split('+')[0].trim();
+                const res = await fetch(`https://rxnav.nlm.nih.gov/REST/rxcui.json?name=${encodeURIComponent(baseName)}`);
+                const data = await res.json();
+                const cui = data.idGroup?.rxnormId?.[0];
+                if (cui) rxcuis.push({ cui, name: drug.Brand });
+            }
+
+            if (rxcuis.length > 1) {
+                const cuiList = rxcuis.map(r => r.cui).join('+');
+                const interactRes = await fetch(`https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis=${cuiList}`);
+                const interactData = await interactRes.json();
+                
+                let newDetected = 0;
+                if (interactData.fullInteractionTypeGroup) {
+                    const safeBanner = container.querySelector('#safeMessageBanner');
+                    
+                    interactData.fullInteractionTypeGroup.forEach(group => {
+                        group.fullInteractionType.forEach(type => {
+                            const desc = type.interactionPair[0].description;
+                            const severity = type.interactionPair[0].severity || "عالي الخطورة";
+                            
+                            newDetected++;
+                            if (safeBanner) safeBanner.style.display = 'none';
+
+                            const alertCard = document.createElement("div");
+                            alertCard.className = "interaction-alert-card";
+                            
+                            const drugA = type.minConcept[0]?.name || "دواء أ";
+                            const drugB = type.minConcept[1]?.name || "دواء ب";
+                            
+                            alertCard.innerHTML = `
+                              <div class="alert-card-title">
+                                <span class="drug-name-box">${drugA}</span>
+                                <span style="font-weight: 500; font-size: 13px; color: var(--text-gray);">+</span>
+                                <span class="drug-name-box">${drugB}</span>
+                                <span class="alert-card-severity" style="background:var(--danger-red);">${severity === 'N/A' ? 'مهم' : severity}</span>
+                                <span style="font-size: 11.5px; color: var(--text-gray); margin-right: 5px; font-weight: 500;">(عالمي 🌐)</span>
+                              </div>
+                              <div class="alert-card-desc">
+                                ${desc}
+                              </div>
+                            `;
+                            container.appendChild(alertCard);
+                        });
+                    });
+                }
+                
+                if (offlineDetectedCount === 0 && newDetected === 0) {
+                    const safeBanner = container.querySelector('#safeMessageBanner');
+                    if (safeBanner) {
+                       safeBanner.innerHTML = "🟢 لا توجد تداخلات حادة وخطيرة مكتشفة بين الأدوية المحددة. (الفحص آمن محلياً وعالمياً)";
+                       safeBanner.style.display = 'block';
+                    }
+                }
+            }
+
+            // Remove loading
+            document.getElementById(loadingId)?.remove();
+        } catch (e) {
+            console.error("RxNav API Error:", e);
+            document.getElementById(loadingId)?.remove();
+        }
+    }
+
+    // ==========================================
+    // 8) Delete Confirmation Overlay Controllers
+    // ==========================================
+    function openDeleteModal() {
+      const modal = document.getElementById("deleteConfirmOverlay");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeDeleteModal() {
+      const modal = document.getElementById("deleteConfirmOverlay");
+      if (modal) modal.style.display = "none";
+    }
+
+    function executeClearAll() {
+      selectedDrugs = [];
+      renderSelectedDrugs();
+      closeDeleteModal();
+    }
+
+    // ==========================================
+    // 9) Screen and Tab Navigation Logic
+    // ==========================================
+    function showResultsScreen() {
+      document.getElementById("homeScreen").classList.remove("active");
+      document.getElementById("resultsScreen").classList.add("active");
+      switchTab('tab-drug-drug'); // default tab
+    }
+
+    function showHomeScreen() {
+      document.getElementById("resultsScreen").classList.remove("active");
+      document.getElementById("homeScreen").classList.add("active");
+    }
+
+    function switchTab(tabId) {
+      // Hide all panels
+      document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      // Deactivate all buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show selected
+      document.getElementById(tabId).classList.add('active');
+      document.getElementById('btn-' + tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
